@@ -1,0 +1,192 @@
+version: '2.1'
+
+networks:
+  core_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.25.0/24
+          gateway: 192.168.25.1
+
+
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: "mongodb"
+    hostname: mongodb
+    networks: 
+      core_network:
+        ipv4_address: ${mongodb_ip}
+
+  webui:
+    container_name: webui
+    image: j0lama/free5gc-webui
+    depends_on:
+      - mongodb
+    environment:
+      - DB_URI=mongodb://mongodb/free5gc
+    hostname: webui
+    ports:
+      - '80:3000'
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_webui.sh"
+    networks: 
+      core_network:
+        ipv4_address: ${webui_ip}
+
+  mongodbloader:
+    image: mongo:latest
+    depends_on:
+      - webui
+    environment:
+      - DB_HOST=mongodb
+    volumes:
+      - "./db:/tmp"
+    entrypoint:
+      - "/bin/sh"
+      - "/tmp/mongodb_loader.sh"
+    networks:
+      core_network:
+        ipv4_address: ${mongodbloader_ip}
+
+  hss:
+    container_name: hss
+    image: j0lama/free5gc-base
+    depends_on:
+      - mongodb
+    hostname: hss
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_hss.sh"
+      - "${mongodb_ip}"
+      - "${hss_ip}"
+      - "${amf_ip}"
+    networks: 
+      core_network:
+        ipv4_address: ${hss_ip}
+
+  amf:
+    container_name: amf
+    image: j0lama/free5gc-base
+    depends_on:
+      - hss
+    hostname: amf
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_amf.sh"
+      - "${mongodb_ip}"
+      - "${hss_ip}"
+      - "${amf_ip}"
+      - "${smf_ip}"
+    networks: 
+      core_network:
+        ipv4_address: ${amf_ip}
+
+  smf:
+    container_name: smf
+    image: j0lama/free5gc-base
+    depends_on:
+      - amf
+    hostname: smf
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_smf.sh"
+      - "${smf_ip}"
+      - "${upf_ip}"
+      - "${pcrf_ip}"
+    networks: 
+      core_network:
+        ipv4_address: ${smf_ip}
+
+  pcrf:
+    container_name: pcrf
+    image: j0lama/free5gc-base
+    depends_on:
+      - smf
+    hostname: pcrf
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_pcrf.sh"
+      - "${mongodb_ip}"
+      - "${smf_ip}"
+      - "${pcrf_ip}"
+    networks: 
+      core_network:
+        ipv4_address: ${pcrf_ip}
+
+  upf:
+    container_name: upf
+    image: j0lama/free5gc-base
+    depends_on:
+      - pcrf
+    hostname: upf
+    entrypoint:
+      - "/bin/sh"
+      - "/etc/free5gc/run_upf.sh"
+      - "${upf_ip}"
+    cap_add:
+      - NET_ADMIN
+    devices:
+       - /dev/net/tun
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    networks: 
+      core_network:
+        ipv4_address: ${upf_ip}
+
+#  enb:
+#    container_name: enb
+#    image: j0lama/oai-enb_ue
+#    depends_on:
+#      - pcrf
+#    hostname: upf
+#    entrypoint:
+#      - "/bin/sh"
+#      - "run_enb.sh"
+#      - "${amf_ip}"
+#      - "${enb_ip}"
+#    devices:
+#       - /dev/net/tun
+#    networks: 
+#      core_network:
+#        ipv4_address: ${enb_ip}
+
+  enb:
+    build: ./virtual-UE-eNB
+    container_name: enb
+    depends_on:
+      - upf
+    ipc: shareable
+    cap_add:
+      - SYS_NICE
+    networks:
+      core_network:
+         ipv4_address: ${enb_ip}
+    volumes:
+      - ./virtual-UE-eNB/run_enb.sh:/root/run_enb.sh
+    entrypoint:
+      - "/bin/sh"
+      - "/root/run_enb.sh"
+      - "${amf_ip}"
+      - "${enb_ip}"
+
+  ue:
+    container_name: ue
+    build: ./virtual-UE-eNB
+    ipc: "container:enb"
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    devices:
+      - /dev/net/tun
+    network_mode: "none"
+    depends_on:
+      - enb
+    volumes:
+      - ./virtual-UE-eNB/run_ue.sh:/root/run_ue.sh
+    entrypoint:
+      - "/bin/sh"
+      - "/root/run_ue.sh"
