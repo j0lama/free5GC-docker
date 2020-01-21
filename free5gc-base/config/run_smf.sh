@@ -1,8 +1,8 @@
 #!/bin/sh
 
-if [ $# -ne 3 ]
+if [ $# -ne 4 ]
   then
-    echo "USE: ./run_smf.sh <SMF_IP> <UPF_IP> <PCRF_IP>"
+    echo "USE: ./run_smf.sh <SMF_IP> <UPF_IP> <PCRF_IP> <AMF_IP>"
     exit 1
 fi
 
@@ -13,7 +13,7 @@ sleep ${MONGODB_STARTUP_TIME}
 echo "Modifying configuration files..."
 sed -i 's/smf_ip/'$1'/g' /etc/free5gc/smf.conf
 sed -i 's/upf_ip/'$2'/g' /etc/free5gc/smf.conf
-#sed -i '/ue_pool/i #AMF ip\n    http:\n      addr: '$1'\n      port: 8080' /etc/free5gc/smf.conf
+sed -i 's/amf_ip/'$4'/g' /etc/free5gc/smf.conf
 sed -i 's/smf_ip/'$1'/g' /etc/free5gc/freeDiameter/smf.conf
 sed -i 's/pcrf_ip/'$3'/g' /etc/free5gc/freeDiameter/smf.conf
 

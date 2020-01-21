@@ -28,6 +28,7 @@ RUN autoreconf -iv
 RUN ./configure --prefix=`pwd`/install
 RUN rm src/smf/http_server/main.go
 COPY main.go src/smf/http_server/main.go
+COPY amf.go src/amf/http_server/main.go
 RUN make -j `nproc`
 RUN make install
 

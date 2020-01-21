@@ -6,8 +6,8 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 192.168.25.0/24
-          gateway: 192.168.25.1
+        - subnet: 172.19.0.0/16
+          gateway: 172.19.0.1
 
 
 
@@ -97,6 +97,7 @@ services:
       - "${smf_ip}"
       - "${upf_ip}"
       - "${pcrf_ip}"
+      - "${smf_ip}"
     networks: 
       core_network:
         ipv4_address: ${smf_ip}
@@ -130,63 +131,64 @@ services:
     cap_add:
       - NET_ADMIN
     devices:
-       - /dev/net/tun
+       - "/dev/net/tun:/dev/net/tun"
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
     networks: 
       core_network:
         ipv4_address: ${upf_ip}
 
+  enb:
+    image: kannan1981/enb_latest:latest
+    hostname: enb
+    depends_on:
+     - upf
+    container_name: enb
+    privileged: true
+    volumes:
+     - /dev/bus/usb:/dev/bus/usb
+     - ./conf/enb.10MHz.b200:/home/opencells-mods/enb.10MHz.b200
+    command: ['./docker-entrypoint.sh']
+    entrypoint:
+     - /bin/bash
+    networks:
+     core_network:
+       ipv4_address: ${enb_ip}
+    tty: true
+
 #  enb:
+#    build: ./virtual-UE-eNB
 #    container_name: enb
-#    image: j0lama/oai-enb_ue
 #    depends_on:
-#      - pcrf
-#    hostname: upf
+#      - upf
+#    ipc: shareable
+#    cap_add:
+#      - SYS_NICE
+#    networks:
+#      core_network:
+#         ipv4_address: ${enb_ip}
+#    volumes:
+#      - ./virtual-UE-eNB/run_enb.sh:/root/run_enb.sh
 #    entrypoint:
 #      - "/bin/sh"
-#      - "run_enb.sh"
+#      - "/root/run_enb.sh"
 #      - "${amf_ip}"
 #      - "${enb_ip}"
+#
+#  ue:
+#    container_name: ue
+#    build: ./virtual-UE-eNB
+#    ipc: "container:enb"
+#    cap_add:
+#      - NET_ADMIN
+#      - SYS_NICE
 #    devices:
-#       - /dev/net/tun
-#    networks: 
-#      core_network:
-#        ipv4_address: ${enb_ip}
-
-  enb:
-    build: ./virtual-UE-eNB
-    container_name: enb
-    depends_on:
-      - upf
-    ipc: shareable
-    cap_add:
-      - SYS_NICE
-    networks:
-      core_network:
-         ipv4_address: ${enb_ip}
-    volumes:
-      - ./virtual-UE-eNB/run_enb.sh:/root/run_enb.sh
-    entrypoint:
-      - "/bin/sh"
-      - "/root/run_enb.sh"
-      - "${amf_ip}"
-      - "${enb_ip}"
-
-  ue:
-    container_name: ue
-    build: ./virtual-UE-eNB
-    ipc: "container:enb"
-    cap_add:
-      - NET_ADMIN
-      - SYS_NICE
-    devices:
-      - /dev/net/tun
-    network_mode: "none"
-    depends_on:
-      - enb
-    volumes:
-      - ./virtual-UE-eNB/run_ue.sh:/root/run_ue.sh
-    entrypoint:
-      - "/bin/sh"
-      - "/root/run_ue.sh"
+#      - /dev/net/tun
+#    network_mode: "none"
+#    depends_on:
+#      - enb
+#    volumes:
+#      - ./virtual-UE-eNB/run_ue.sh:/root/run_ue.sh
+#    entrypoint:
+#      - "/bin/sh"
+#      - "/root/run_ue.sh"
