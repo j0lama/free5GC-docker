@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    # unimportant, just the name of it that will show up in kubectl
+    name: free5gc
+    labels:
+        app: free5gc
+spec:
+    # number of instances of deployment therefore each app in deployment
+    replicas: 1
+    # how the deployment tells which apps it should manage
+    selector:
+        matchLabels:
+            app: free5gc
+    template:
+        # all of this metadata will be applied to each container in the deployment
+        metadata:
+            labels:
+                app: free5gc
+        spec:
+            containers:
+            - name: mongodb
+              image: mongo:latest
+            - name: webui
+              image: j0lama/free5gc-webui
+              env:
+                  - name: DB_URI
+                    value: "mongodb://mongodb/free5gc"
+              command:
+                  - "/bin/sh"
+                  - "/etc/free5gc/run_webui.sh" 
+            - name: mongodbloader
+              image: mongo:latest
+              env:
+                  # this is the way environment variables are defined
+                  - name: DB_HOST
+                    value: "mongodb"
+              command:
+                  # converted the run script to commands
+                  - "/bin/sh"
+                  - "sleep 5"
+                  - "mongoimport --host mongodb --db free5gc --collection subscribers --file /tmp/imsi1.json --type json  --jsonArray"
+            - name: hss
+              image: j0lama/free5gc-base
+              command:
+                  - "/bin/sh"
+                  - "/etc/free5gc/run_hss.sh"
+                    # below here should be the env variables of the service (services needed to be started before the deployment)
